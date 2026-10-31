@@ -62,4 +62,5 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     //implementation("org.jetbrains.kotlin:kotlinx-coroutines-android:1.6.4")
+    implementation("io.coil-kt:coil-compose:2.6.0")
 }

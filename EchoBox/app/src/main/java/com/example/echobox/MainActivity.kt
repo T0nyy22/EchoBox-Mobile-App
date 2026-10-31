@@ -30,6 +30,15 @@ import android.app.TimePickerDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.delay
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil.compose.AsyncImage
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,12 +85,13 @@ class MainViewModel(private val dao: MessagesDao) : ViewModel() {
         }
     }
 
-    fun addMessage(title: String, messageText: String, targetedDate: Long) {
+    fun addMessage(title: String, messageText: String, targetedDate: Long, imageUri: String?) {
         viewModelScope.launch {
             val newMessage = MessagesEntity(
                 title = title,
                 message = messageText,
                 targetedDate = targetedDate,
+                image = imageUri,
                 isUnlocked = targetedDate <= System.currentTimeMillis()
             )
             dao.insertMessage(newMessage)
@@ -167,8 +177,8 @@ fun MainScreen(viewModel: MainViewModel) {
             if (showAddDialog) {
                 AddMessageDialog(
                     onDismiss = { showAddDialog = false },
-                    onSave = { title, content, targetDate ->
-                        viewModel.addMessage(title, content, targetDate)
+                    onSave = { title, content, targetDate, imageUri  ->
+                        viewModel.addMessage(title, content, targetDate, imageUri)
                         showAddDialog = false
                     }
                 )
@@ -213,6 +223,18 @@ fun MessageCard(message: MessagesEntity, currentTime: Long, onUnlock: () -> Unit
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
+                if (message.image != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AsyncImage(
+                        model = Uri.parse(message.image),
+                        contentDescription = "Capsule Image",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             } else if (isTimeReached) {
                 // TIME REACHED, BUT NOT YET OPENED BY USER: Show teaser / open prompt
                 Text(
@@ -251,9 +273,19 @@ fun MessageCard(message: MessagesEntity, currentTime: Long, onUnlock: () -> Unit
 }
 
 @Composable
-fun AddMessageDialog(onDismiss: () -> Unit, onSave: (String, String, Long) -> Unit) {
+fun AddMessageDialog(onDismiss: () -> Unit, onSave: (String, String, Long, String?) -> Unit) {
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+
+    // Implicit Intent launcher for the Android Photo Picker
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            selectedImageUri = uri
+        }
+    }
 
     // Calendar instance to hold the selected target date and time
     val calendar = remember { Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) } }
@@ -282,6 +314,33 @@ fun AddMessageDialog(onDismiss: () -> Unit, onSave: (String, String, Long) -> Un
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
                 )
+
+                // Button to trigger the implicit intent
+                Button(
+                    onClick = {
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Image, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(if (selectedImageUri == null) "Attach Image" else "Image Selected ✓")
+                }
+
+                //Show a small preview if an image was selected
+                if (selectedImageUri != null) {
+                    AsyncImage(
+                        model = selectedImageUri,
+                        contentDescription = "Selected Image",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                            .clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
 
                 // Date & Time Picker Trigger Field
                 OutlinedTextField(
@@ -330,7 +389,7 @@ fun AddMessageDialog(onDismiss: () -> Unit, onSave: (String, String, Long) -> Un
             Button(
                 onClick = {
                     if (title.isNotBlank() && content.isNotBlank()) {
-                        onSave(title, content, targetMillis)
+                        onSave(title, content, targetMillis, selectedImageUri?.toString())
                     }
                 }
             ) {
