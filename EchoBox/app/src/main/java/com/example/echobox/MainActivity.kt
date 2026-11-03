@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -104,6 +105,7 @@ class MainViewModel(
     fun addMessage(
         title: String,
         messageText: String,
+        category: String,
         targetedDate: Long,
         imageUri: String?
     ) {
@@ -118,6 +120,7 @@ class MainViewModel(
             val newMessage = MessagesEntity(
                 title = title,
                 message = messageText,
+                category = category,
                 targetedDate = targetedDate,
                 image = permanentImagePath,
                 isUnlocked = targetedDate <= System.currentTimeMillis()
@@ -213,8 +216,14 @@ fun MainScreen(viewModel: MainViewModel) {
             if (showAddDialog) {
                 AddMessageDialog(
                     onDismiss = { showAddDialog = false },
-                    onSave = { title, content, targetDate, imageUri  ->
-                        viewModel.addMessage(title, content, targetDate, imageUri)
+                    onSave = { title, content, category, targetDate, imageUri ->
+                        viewModel.addMessage(
+                            title,
+                            content,
+                            category,
+                            targetDate,
+                            imageUri
+                        )
                         showAddDialog = false
                     }
                 )
@@ -240,6 +249,13 @@ fun MessageCard(message: MessagesEntity, currentTime: Long, onUnlock: () -> Unit
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(text = message.title, style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "Category: ${message.category}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
                 Icon(
                     imageVector = if (message.isUnlocked) Icons.Default.LockOpen else Icons.Default.Lock,
                     contentDescription = "Status",
@@ -309,10 +325,16 @@ fun MessageCard(message: MessagesEntity, currentTime: Long, onUnlock: () -> Unit
 }
 
 @Composable
-fun AddMessageDialog(onDismiss: () -> Unit, onSave: (String, String, Long, String?) -> Unit) {
+fun AddMessageDialog(onDismiss: () -> Unit, onSave: (String, String, String, Long, String?) -> Unit) {
     var title by remember { mutableStateOf("") }
     var content by remember { mutableStateOf("") }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedCategory by remember {
+        mutableStateOf(MessageCategory.PERSONAL)
+    }
+    var expanded by remember {
+        mutableStateOf(false)
+    }
 
     // Implicit Intent launcher for the Android Photo Picker
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -350,7 +372,38 @@ fun AddMessageDialog(onDismiss: () -> Unit, onSave: (String, String, Long, Strin
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 3
                 )
+                // Category Selection
+                Box(modifier = Modifier.fillMaxWidth()) {
 
+                    OutlinedButton(
+                        onClick = { expanded = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Category: $selectedCategory")
+                        Spacer(modifier = Modifier.weight(1f))
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Select Category"
+                        )
+                    }
+
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        MessageCategory.categories.forEach { category ->
+
+                            DropdownMenuItem(
+                                text = { Text(category) },
+                                onClick = {
+                                    selectedCategory = category
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
                 // Button to trigger the implicit intent
                 Button(
                     onClick = {
@@ -425,7 +478,13 @@ fun AddMessageDialog(onDismiss: () -> Unit, onSave: (String, String, Long, Strin
             Button(
                 onClick = {
                     if (title.isNotBlank() && content.isNotBlank()) {
-                        onSave(title, content, targetMillis, selectedImageUri?.toString())
+                        onSave(
+                            title,
+                            content,
+                            selectedCategory,
+                            targetMillis,
+                            selectedImageUri?.toString()
+                        )
                     }
                 }
             ) {
