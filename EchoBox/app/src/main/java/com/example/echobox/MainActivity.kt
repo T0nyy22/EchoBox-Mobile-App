@@ -131,7 +131,47 @@ class MainViewModel(
             loadMessages()
         }
     }
+    fun updateMessage(
+        oldMessage: MessagesEntity,
+        title: String,
+        messageText: String,
+        category: String,
+        targetedDate: Long,
+        imageUri: String?
+    ) {
+        viewModelScope.launch {
 
+            // Save a new image only if the user selected one
+            val newImagePath = withContext(Dispatchers.IO) {
+                imageUri?.let {
+                    imageStorageManager.saveImage(it)
+                }
+            }
+
+            // Keep the old image if no new image was selected
+            val finalImagePath = newImagePath ?: oldMessage.image
+
+            val updatedMessage = oldMessage.copy(
+                title = title,
+                message = messageText,
+                category = category,
+                targetedDate = targetedDate,
+                image = finalImagePath,
+                isUnlocked = targetedDate <= System.currentTimeMillis()
+            )
+
+            dao.updateMessage(updatedMessage)
+
+            // Delete the old image only if a new one replaced it
+            if (newImagePath != null && oldMessage.image != null) {
+                withContext(Dispatchers.IO) {
+                    imageStorageManager.deleteImage(oldMessage.image)
+                }
+            }
+
+            loadMessages()
+        }
+    }
     fun unlockMessage(messageEntity: MessagesEntity) {
         if (messageEntity.targetedDate <= System.currentTimeMillis() && !messageEntity.isUnlocked) {
             viewModelScope.launch {
@@ -161,7 +201,7 @@ class MainViewModel(
 fun MainScreen(viewModel: MainViewModel) {
     val messages by viewModel.messages.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
-
+    var messageToEdit by remember { mutableStateOf<MessagesEntity?>(null) }
     // Real-time ticker state to force recomposition every second so UI updates instantly when time is reached
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -207,7 +247,11 @@ fun MainScreen(viewModel: MainViewModel) {
                             message = message,
                             currentTime = currentTime,
                             onUnlock = { viewModel.unlockMessage(message) },
-                            onDelete = { viewModel.deleteMessage(message) }
+                            onDelete = { viewModel.deleteMessage(message) },
+                            onUpdate = {
+                                messageToEdit = message
+                                showAddDialog = true
+                            }
                         )
                     }
                 }
@@ -215,16 +259,34 @@ fun MainScreen(viewModel: MainViewModel) {
 
             if (showAddDialog) {
                 AddMessageDialog(
-                    onDismiss = { showAddDialog = false },
-                    onSave = { title, content, category, targetDate, imageUri ->
-                        viewModel.addMessage(
-                            title,
-                            content,
-                            category,
-                            targetDate,
-                            imageUri
-                        )
+                    messageToEdit = messageToEdit,
+                    onDismiss = {
                         showAddDialog = false
+                        messageToEdit = null
+                    },
+                    onSave = { title, content, category, targetDate, imageUri ->
+
+                        if (messageToEdit != null) {
+                            viewModel.updateMessage(
+                                messageToEdit!!,
+                                title,
+                                content,
+                                category,
+                                targetDate,
+                                imageUri
+                            )
+                        } else {
+                            viewModel.addMessage(
+                                title,
+                                content,
+                                category,
+                                targetDate,
+                                imageUri
+                            )
+                        }
+
+                        showAddDialog = false
+                        messageToEdit = null
                     }
                 )
             }
@@ -233,7 +295,7 @@ fun MainScreen(viewModel: MainViewModel) {
 }
 
 @Composable
-fun MessageCard(message: MessagesEntity, currentTime: Long, onUnlock: () -> Unit, onDelete: () -> Unit) {
+fun MessageCard(message: MessagesEntity, currentTime: Long, onUnlock: () -> Unit, onDelete: () -> Unit, onUpdate: () -> Unit) {
     val isTimeReached = message.targetedDate <= currentTime
     val dateFormat = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault())
     val targetDateStr = dateFormat.format(Date(message.targetedDate))
@@ -316,6 +378,9 @@ fun MessageCard(message: MessagesEntity, currentTime: Long, onUnlock: () -> Unit
                     }
                 }
                 Spacer(modifier = Modifier.weight(1f))
+                TextButton(onClick = onUpdate) {
+                    Text("Update" , color = MaterialTheme.colorScheme.primary)
+                }
                 TextButton(onClick = onDelete) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)
                 }
@@ -325,12 +390,25 @@ fun MessageCard(message: MessagesEntity, currentTime: Long, onUnlock: () -> Unit
 }
 
 @Composable
-fun AddMessageDialog(onDismiss: () -> Unit, onSave: (String, String, String, Long, String?) -> Unit) {
-    var title by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
-    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
-    var selectedCategory by remember {
-        mutableStateOf(MessageCategory.PERSONAL)
+fun AddMessageDialog(
+    messageToEdit: MessagesEntity?,
+    onDismiss: () -> Unit,
+    onSave: (String, String, String, Long, String?) -> Unit
+) {
+    var title by remember(messageToEdit) {
+        mutableStateOf(messageToEdit?.title ?: "")
+    }
+
+    var content by remember(messageToEdit) {
+        mutableStateOf(messageToEdit?.message ?: "")
+    }
+
+    var selectedImageUri by remember(messageToEdit) {
+        mutableStateOf<Uri?>(null)
+    }
+
+    var selectedCategory by remember(messageToEdit) {
+        mutableStateOf(messageToEdit?.category ?: MessageCategory.PERSONAL)
     }
     var expanded by remember {
         mutableStateOf(false)
@@ -346,8 +424,19 @@ fun AddMessageDialog(onDismiss: () -> Unit, onSave: (String, String, String, Lon
     }
 
     // Calendar instance to hold the selected target date and time
-    val calendar = remember { Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) } }
-    var targetMillis by remember { mutableStateOf(calendar.timeInMillis) }
+    val calendar = remember(messageToEdit) {
+        Calendar.getInstance().apply {
+            if (messageToEdit != null) {
+                timeInMillis = messageToEdit.targetedDate
+            } else {
+                add(Calendar.DAY_OF_YEAR, 1)
+            }
+        }
+    }
+
+    var targetMillis by remember(messageToEdit) {
+        mutableStateOf(calendar.timeInMillis)
+    }
 
     val context = LocalContext.current
     // 12-hour format with AM/PM
@@ -355,7 +444,9 @@ fun AddMessageDialog(onDismiss: () -> Unit, onSave: (String, String, String, Lon
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Create Time Capsule") },
+        title = {
+            Text(if (messageToEdit == null) "Create Time Capsule" else "Update Time Capsule")
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
@@ -488,7 +579,7 @@ fun AddMessageDialog(onDismiss: () -> Unit, onSave: (String, String, String, Lon
                     }
                 }
             ) {
-                Text("Seal Capsule")
+                Text(if (messageToEdit == null) "Seal Capsule" else "Save Changes")
             }
         },
         dismissButton = {
