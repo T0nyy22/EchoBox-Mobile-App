@@ -21,10 +21,12 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
+import java.io.File
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.foundation.clickable
@@ -39,6 +41,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
+import android.content.Context
+import kotlinx.coroutines.Dispatchers
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,7 +62,10 @@ class MainActivity : ComponentActivity() {
                     factory = object : ViewModelProvider.Factory {
                         @Suppress("UNCHECKED_CAST")
                         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                            return MainViewModel(dao) as T
+                            return MainViewModel(
+                                dao,
+                                applicationContext
+                            ) as T
                         }
                     }
                 )
@@ -70,10 +77,19 @@ class MainActivity : ComponentActivity() {
 }
 
 // ViewModel handling database communication and state management
-class MainViewModel(private val dao: MessagesDao) : ViewModel() {
+class MainViewModel(
+    private val dao: MessagesDao,
+    context: Context
+) : ViewModel() {
 
-    private val _messages = MutableStateFlow<List<MessagesEntity>>(emptyList())
-    val messages: StateFlow<List<MessagesEntity>> = _messages.asStateFlow()
+    private val imageStorageManager =
+        ImageStorageManager(context)
+
+    private val _messages =
+        MutableStateFlow<List<MessagesEntity>>(emptyList())
+
+    val messages: StateFlow<List<MessagesEntity>> =
+        _messages.asStateFlow()
 
     init {
         loadMessages()
@@ -85,16 +101,30 @@ class MainViewModel(private val dao: MessagesDao) : ViewModel() {
         }
     }
 
-    fun addMessage(title: String, messageText: String, targetedDate: Long, imageUri: String?) {
+    fun addMessage(
+        title: String,
+        messageText: String,
+        targetedDate: Long,
+        imageUri: String?
+    ) {
         viewModelScope.launch {
+
+            val permanentImagePath = withContext(Dispatchers.IO) {
+                imageUri?.let {
+                    imageStorageManager.saveImage(it)
+                }
+            }
+
             val newMessage = MessagesEntity(
                 title = title,
                 message = messageText,
                 targetedDate = targetedDate,
-                image = imageUri,
+                image = permanentImagePath,
                 isUnlocked = targetedDate <= System.currentTimeMillis()
             )
+
             dao.insertMessage(newMessage)
+
             loadMessages()
         }
     }
@@ -111,7 +141,13 @@ class MainViewModel(private val dao: MessagesDao) : ViewModel() {
 
     fun deleteMessage(messageEntity: MessagesEntity) {
         viewModelScope.launch {
+
             dao.deleteMessage(messageEntity)
+
+            withContext(Dispatchers.IO) {
+                imageStorageManager.deleteImage(messageEntity.image)
+            }
+
             loadMessages()
         }
     }
@@ -226,7 +262,7 @@ fun MessageCard(message: MessagesEntity, currentTime: Long, onUnlock: () -> Unit
                 if (message.image != null) {
                     Spacer(modifier = Modifier.height(8.dp))
                     AsyncImage(
-                        model = Uri.parse(message.image),
+                        model = File(message.image),
                         contentDescription = "Capsule Image",
                         modifier = Modifier
                             .fillMaxWidth()
