@@ -11,5 +11,6 @@ data class MessagesEntity (
     val createdAt: Long = System.currentTimeMillis(),
     val targetedDate: Long,
     val image: String? = null,
-    val isUnlocked: Boolean = false
+    val isUnlocked: Boolean = false,
+    val category: String = MessageCategory.PERSONAL
 )
