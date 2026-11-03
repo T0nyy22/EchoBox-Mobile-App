@@ -10,6 +10,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -210,7 +212,7 @@ fun MainScreen(viewModel: MainViewModel) {
             currentTime = System.currentTimeMillis()
         }
     }
-
+    val context = LocalContext.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -251,6 +253,13 @@ fun MainScreen(viewModel: MainViewModel) {
                             onUpdate = {
                                 messageToEdit = message
                                 showAddDialog = true
+                            },
+                            onClick = {
+                                if (message.isUnlocked) {
+                                    val intent = Intent(context, MessageDetailsActivity::class.java)
+                                    intent.putExtra("message_id", message.id)
+                                    context.startActivity(intent)
+                                }
                             }
                         )
                     }
@@ -295,13 +304,15 @@ fun MainScreen(viewModel: MainViewModel) {
 }
 
 @Composable
-fun MessageCard(message: MessagesEntity, currentTime: Long, onUnlock: () -> Unit, onDelete: () -> Unit, onUpdate: () -> Unit) {
+fun MessageCard(message: MessagesEntity, currentTime: Long, onUnlock: () -> Unit, onDelete: () -> Unit, onUpdate: () -> Unit, onClick: () -> Unit) {
     val isTimeReached = message.targetedDate <= currentTime
     val dateFormat = SimpleDateFormat("yyyy-MM-dd hh:mm a", Locale.getDefault())
     val targetDateStr = dateFormat.format(Date(message.targetedDate))
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -329,39 +340,20 @@ fun MessageCard(message: MessagesEntity, currentTime: Long, onUnlock: () -> Unit
             Text(text = "Target Date: $targetDateStr", style = MaterialTheme.typography.bodySmall)
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Check if it's unlocked in the database
-            if (message.isUnlocked) {
-                // UNLOCKED: Show the secret message proudly!
+            // Show status only for locked messages
+            if (!message.isUnlocked) {
                 Text(
-                    text = message.message,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                if (message.image != null) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    AsyncImage(
-                        model = File(message.image),
-                        contentDescription = "Capsule Image",
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-            } else if (isTimeReached) {
-                // TIME REACHED, BUT NOT YET OPENED BY USER: Show teaser / open prompt
-                Text(
-                    text = "✨ Time capsule is ready to be opened!",
+                    text = if (isTimeReached) {
+                        "✨ Time capsule is ready to be opened!"
+                    } else {
+                        "🔒 Locked until target date is reached."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            } else {
-                // STILL LOCKED: Keep it hidden
-                Text(
-                    text = "🔒 Locked until target date is reached.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outline
+                    color = if (isTimeReached) {
+                        MaterialTheme.colorScheme.secondary
+                    } else {
+                        MaterialTheme.colorScheme.outline
+                    }
                 )
             }
 
@@ -378,8 +370,10 @@ fun MessageCard(message: MessagesEntity, currentTime: Long, onUnlock: () -> Unit
                     }
                 }
                 Spacer(modifier = Modifier.weight(1f))
-                TextButton(onClick = onUpdate) {
-                    Text("Update" , color = MaterialTheme.colorScheme.primary)
+                if (message.isUnlocked) {
+                    TextButton(onClick = onUpdate) {
+                        Text("Update", color = MaterialTheme.colorScheme.primary)
+                    }
                 }
                 TextButton(onClick = onDelete) {
                     Text("Delete", color = MaterialTheme.colorScheme.error)

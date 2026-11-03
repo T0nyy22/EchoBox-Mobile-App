@@ -16,7 +16,7 @@ interface MessagesDao {
     suspend fun getAllMessages() : List<MessagesEntity>
 
     @Query("SELECT * FROM messages WHERE id = :id")
-    suspend fun getMessageById(id: Int) : MessagesEntity
+    suspend fun getMessageById(id: Int): MessagesEntity?
 
     @Update
     suspend fun updateMessage(message: MessagesEntity)
