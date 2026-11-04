@@ -204,6 +204,9 @@ fun MainScreen(viewModel: MainViewModel) {
     val messages by viewModel.messages.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var messageToEdit by remember { mutableStateOf<MessagesEntity?>(null) }
+    var selectedFilterCategory by remember { mutableStateOf(MessageCategory.ALL) }
+    var filterExpanded by remember { mutableStateOf(false) }
+
     // Real-time ticker state to force recomposition every second so UI updates instantly when time is reached
     var currentTime by remember { mutableStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -213,6 +216,15 @@ fun MainScreen(viewModel: MainViewModel) {
         }
     }
     val context = LocalContext.current
+
+    val filteredMessages = remember(messages, selectedFilterCategory) {
+        if (selectedFilterCategory == MessageCategory.ALL) {
+            messages
+        } else {
+            messages.filter { it.category == selectedFilterCategory }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -229,76 +241,129 @@ fun MainScreen(viewModel: MainViewModel) {
             }
         }
     ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
-            if (messages.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        "No time capsules found. Tap '+' to create one!",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(messages) { message ->
-                        MessageCard(
-                            message = message,
-                            currentTime = currentTime,
-                            onUnlock = { viewModel.unlockMessage(message) },
-                            onDelete = { viewModel.deleteMessage(message) },
-                            onUpdate = {
-                                messageToEdit = message
-                                showAddDialog = true
-                            },
-                            onClick = {
-                                if (message.isUnlocked) {
-                                    val intent = Intent(context, MessageDetailsActivity::class.java)
-                                    intent.putExtra("message_id", message.id)
-                                    context.startActivity(intent)
-                                }
-                            }
+        Column(
+            modifier = Modifier
+                .padding(innerPadding)
+                .fillMaxSize()
+        ) {
+            // Category Filter Dropdown Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Filter by Category:",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Box {
+                    OutlinedButton(onClick = { filterExpanded = true }) {
+                        Text(selectedFilterCategory)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Select Filter Category"
                         )
                     }
+
+                    DropdownMenu(
+                        expanded = filterExpanded,
+                        onDismissRequest = { filterExpanded = false }
+                    ) {
+                        MessageCategory.filterCategories.forEach { category ->
+                            DropdownMenuItem(
+                                text = { Text(category) },
+                                onClick = {
+                                    selectedFilterCategory = category
+                                    filterExpanded = false
+                                }
+                            )
+                        }
+                    }
                 }
             }
 
-            if (showAddDialog) {
-                AddMessageDialog(
-                    messageToEdit = messageToEdit,
-                    onDismiss = {
-                        showAddDialog = false
-                        messageToEdit = null
-                    },
-                    onSave = { title, content, category, targetDate, imageUri ->
-
-                        if (messageToEdit != null) {
-                            viewModel.updateMessage(
-                                messageToEdit!!,
-                                title,
-                                content,
-                                category,
-                                targetDate,
-                                imageUri
-                            )
-                        } else {
-                            viewModel.addMessage(
-                                title,
-                                content,
-                                category,
-                                targetDate,
-                                imageUri
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                if (filteredMessages.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = if (messages.isEmpty()) {
+                                "No time capsules found. Tap '+' to create one!"
+                            } else {
+                                "No time capsules found for \"$selectedFilterCategory\" category."
+                            },
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(filteredMessages) { message ->
+                            MessageCard(
+                                message = message,
+                                currentTime = currentTime,
+                                onUnlock = { viewModel.unlockMessage(message) },
+                                onDelete = { viewModel.deleteMessage(message) },
+                                onUpdate = {
+                                    messageToEdit = message
+                                    showAddDialog = true
+                                },
+                                onClick = {
+                                    if (message.isUnlocked) {
+                                        val intent = Intent(context, MessageDetailsActivity::class.java)
+                                        intent.putExtra("message_id", message.id)
+                                        context.startActivity(intent)
+                                    }
+                                }
                             )
                         }
-
-                        showAddDialog = false
-                        messageToEdit = null
                     }
-                )
+                }
             }
+        }
+
+        if (showAddDialog) {
+            AddMessageDialog(
+                messageToEdit = messageToEdit,
+                onDismiss = {
+                    showAddDialog = false
+                    messageToEdit = null
+                },
+                onSave = { title, content, category, targetDate, imageUri ->
+
+                    if (messageToEdit != null) {
+                        viewModel.updateMessage(
+                            messageToEdit!!,
+                            title,
+                            content,
+                            category,
+                            targetDate,
+                            imageUri
+                        )
+                    } else {
+                        viewModel.addMessage(
+                            title,
+                            content,
+                            category,
+                            targetDate,
+                            imageUri
+                        )
+                    }
+
+                    showAddDialog = false
+                    messageToEdit = null
+                }
+            )
         }
     }
 }
