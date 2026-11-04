@@ -2,6 +2,7 @@ package com.example.echobox
 
 object MessageCategory {
 
+    const val ALL = "All"
     const val PERSONAL = "Personal"
     const val GOALS = "Goals"
     const val MEMORIES = "Memories"
@@ -17,4 +18,6 @@ object MessageCategory {
         TRAVEL,
         WORK
     )
+
+    val filterCategories = listOf(ALL) + categories
 }
