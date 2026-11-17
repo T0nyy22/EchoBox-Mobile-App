@@ -22,7 +22,7 @@ interface MessagesDao {
     suspend fun getLockedMessages(now: Long): List<MessagesEntity>
 
     @Query("SELECT * FROM messages WHERE targetedDate <= :now ORDER BY createdAt ASC")
-    suspend fun getLockedMessages(now: Long): List<MessagesEntity>
+    suspend fun getUnlockedMessages(now: Long): List<MessagesEntity>
 
     @Update
     suspend fun updateMessage(message: MessagesEntity)
