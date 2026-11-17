@@ -1,0 +1,90 @@
+\documentclass[manuscript,screen]{acmart}
+
+% Remove ACM-specific copyright and conference metadata placeholders since none were supplied
+\settopmatter{printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+\pagestyle{plain}
+
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  keywordstyle=\color{blue!70!black}\bfseries,
+  commentstyle=\color{gray}\itshape,
+  stringstyle=\color{teal!70!black},
+  breaklines=true,
+  frame=single,
+  framesep=4pt,
+  rulecolor=\color{black!20},
+  showstringspaces=false,
+  tabsize=2,
+  morekeywords={var, val, by, remember, mutableStateOf, LaunchedEffect, while, true, delay}
+}
+
+\begin{document}
+
+\title{EchoBox: A Jetpack Compose Android Application for Temporal Self-Communication and Memory Preservation}
+
+\author{The EchoBox Development Team}
+\affiliation{%
+  \institution{EchoBox Open-Source Project}
+  \city{Global}
+  \country{}
+}
+
+\begin{abstract}
+As digital footprints grow increasingly ephemeral and real-time oriented, tools for intentional, delayed self-reflection remain scarce. This paper introduces EchoBox, an open-source Android application developed using modern native technologies---specifically Jetpack Compose, Kotlin Coroutines, and Room Database---designed to facilitate temporal self-communication. EchoBox enables users to compose text messages, attach multimedia, assign categorical tags, and logically time-lock these entries until a specified future date. A live, second-by-second ticker ensures real-time state updates upon maturity. By bridging personal journaling with temporal constraints, EchoBox provides a structured, privacy-focused medium for long-term goal setting, psychological grounding, and asynchronous dialogue with the future self.
+\end{abstract}
+
+\maketitle
+
+\section{Introduction}
+Modern mobile applications are heavily optimized for instant gratification, high-frequency synchronization, and immediate social feedback. Conversely, psychological principles highlight the cognitive and emotional benefits of delayed reflection---specifically, communicating aspirations, emotional states, or advice to one's future self.
+
+To explore this paradigm in a mobile context, we developed EchoBox, a native Android application that bridges personal journaling with strict temporal constraints. EchoBox allows users to create ``time capsules''---sealed packages containing text, metadata tags, and optional photographs---that remain inaccessible until a pre-determined future date and time are reached.
+
+\section{System Architecture \& Tech Stack}
+EchoBox is engineered following modern Android application architecture guidelines, prioritizing reactive UI patterns and robust local persistence:
+\begin{itemize}
+    \item \textbf{User Interface:} Built entirely with Jetpack Compose, ensuring a fluid, declarative layout and responsive state handling.
+    \item \textbf{Architecture \& Concurrency:} State management is driven by Kotlin StateFlow, and asynchronous background tasks (such as disk I/O) are managed safely via Kotlin Coroutines (\texttt{Dispatchers.IO}).
+    \item \textbf{Local Persistence:} Utilizes the Room Database library (\texttt{MessagesDao}, \texttt{MessagesEntity}) for reliable, structured local storage of message metadata.
+    \item \textbf{Media Management:} Integrates the native Android Photo Picker (\texttt{PickVisualMedia}) and Coil for efficient, memory-safe asynchronous image rendering.
+\end{itemize}
+
+\section{Core Implementation Mechanics}
+The core innovation of EchoBox lies in its real-time conditional unlocking mechanism and localized storage pipeline.
+
+\subsection{Real-Time State Evaluation}
+Unlike server-dependent architectures that rely on push notifications or cron jobs to unlock content, EchoBox implements a lightweight reactive ticker inside the \texttt{MainScreen} composable:
+
+\begin{lstlisting}[language=Java]
+var currentTime by remember {
+    mutableStateOf(System.currentTimeMillis())
+}
+LaunchedEffect(Unit) {
+    while (true) {
+        delay(1000L) // Refresh every second
+        currentTime = System.currentTimeMillis()
+    }
+}
+\end{lstlisting}
+
+This ticker continuously re-evaluates whether a message's \texttt{targetedDate} has passed. When \texttt{targetedDate <= currentTime}, the UI state transitions automatically, prompting the user with a distinct visual indicator and activating the ``Open Capsule'' action button.
+
+\subsection{Image Storage Pipeline}
+Attached images are handled securely to prevent memory leaks and redundant file duplication. Selected URIs are processed through an \texttt{ImageStorageManager} that copies assets into app-private internal storage, persisting file paths inside the Room database while ensuring orphaned images are properly garbage-collected upon deletion.
+
+\section{Discussion and Use Cases}
+EchoBox serves multiple psychological and productivity-oriented use cases:
+\begin{enumerate}
+    \item \textbf{Goal Tracking \& Accountability:} Users can set 6-month or 1-year goals, sealing their intentions and reviewing whether milestones were achieved upon unlocking.
+    \item \textbf{Emotional Reflection:} Writing letters during periods of high stress or joy to be read during future reflective periods.
+    \item \textbf{Privacy-First Design:} Because all data and images are stored locally using Room and app-private storage, users retain absolute ownership of their historical records without external cloud exposure.
+\end{enumerate}
+
+\section{Conclusion and Future Work}
+EchoBox demonstrates how modern Android frameworks (Jetpack Compose, Room, Coroutines) can be harmonized to build a performant, privacy-respecting temporal journaling tool. Future iterations of EchoBox will explore optional, zero-knowledge end-to-end encrypted cloud synchronization, and AI-driven sentiment analysis trends over multi-year archives.
+
+\end{document}
