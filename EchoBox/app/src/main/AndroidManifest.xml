@@ -27,6 +27,9 @@
             android:name=".MessageDetailsActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".CapsuleListActivity"
+            android:exported="false" />
     </application>
 
 </manifest>
