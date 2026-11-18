@@ -14,6 +14,7 @@ import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,9 @@ import androidx.compose.ui.layout.ContentScale
 import coil.compose.AsyncImage
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import android.widget.Toast
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -281,6 +285,45 @@ fun MainScreen(viewModel: MainViewModel) {
                                 }
                             )
                         }
+                    }
+                }
+                // Explicit intents
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            val intent = Intent(context, CapsuleListActivity::class.java)
+                            intent.putExtra(
+                                CapsuleListActivity.EXTRA_MODE,
+                                CapsuleListActivity.MODE_LOCKED
+                            )
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(imageVector = Icons.Default.Lock, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Locked")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            val intent = Intent(context, CapsuleListActivity::class.java)
+                            intent.putExtra(
+                                CapsuleListActivity.EXTRA_MODE,
+                                CapsuleListActivity.MODE_UNLOCKED
+                            )
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(imageVector = Icons.Default.LockOpen, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Unlocked")
                     }
                 }
             }
