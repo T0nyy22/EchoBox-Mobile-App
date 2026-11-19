@@ -287,46 +287,47 @@ fun MainScreen(viewModel: MainViewModel) {
                         }
                     }
                 }
+            }
                 // Explicit intents
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Row(
+                modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(context, CapsuleListActivity::class.java)
+                        intent.putExtra(
+                            CapsuleListActivity.EXTRA_MODE,
+                            CapsuleListActivity.MODE_LOCKED
+                        )
+                        context.startActivity(intent)
+                    },
+                        modifier = Modifier.weight(1f)
                 ) {
-                    OutlinedButton(
-                        onClick = {
-                            val intent = Intent(context, CapsuleListActivity::class.java)
-                            intent.putExtra(
-                                CapsuleListActivity.EXTRA_MODE,
-                                CapsuleListActivity.MODE_LOCKED
-                            )
-                            context.startActivity(intent)
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(imageVector = Icons.Default.Lock, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Locked")
-                    }
+                    Icon(imageVector = Icons.Default.Lock, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Locked")
+                }
 
-                    OutlinedButton(
-                        onClick = {
-                            val intent = Intent(context, CapsuleListActivity::class.java)
-                            intent.putExtra(
-                                CapsuleListActivity.EXTRA_MODE,
-                                CapsuleListActivity.MODE_UNLOCKED
-                            )
-                            context.startActivity(intent)
-                        },
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(context, CapsuleListActivity::class.java)
+                        intent.putExtra(
+                            CapsuleListActivity.EXTRA_MODE,
+                            CapsuleListActivity.MODE_UNLOCKED
+                        )
+                        context.startActivity(intent)
+                    },
                         modifier = Modifier.weight(1f)
-                    ) {
+                ) {
                         Icon(imageVector = Icons.Default.LockOpen, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Unlocked")
-                    }
                 }
             }
+
 
             Box(
                 modifier = Modifier
